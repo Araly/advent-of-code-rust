@@ -42,16 +42,26 @@ fn get_reports(input: &str) -> Option<Vec<Vec<u32>>> {
 fn get_safe_reports_count(reports: Vec<Vec<u32>>, problem_dampler: bool) -> Option<u32> {
     let mut count = 0;
     for report in reports {
-        if is_safe_report(report, problem_dampler) {
+        let safe = is_safe_report(report.clone());
+        if safe {
             count += 1;
+            continue;
+        } else if problem_dampler {
+            for i in 0..report.len() {
+                let mut report = report.clone();
+                report.remove(i);
+                if is_safe_report(report) {
+                    count += 1;
+                    break;
+                }
+            }
         }
     }
 
     Some(count)
 }
 
-fn is_safe_report(report: Vec<u32>, problem_dampler: bool) -> bool {
-    // let mut output = "".to_string();
+fn is_safe_report(report: Vec<u32>) -> bool {
     if report.is_empty() {
         return false;
     }
@@ -97,25 +107,9 @@ fn is_safe_report(report: Vec<u32>, problem_dampler: bool) -> bool {
                 }
             }
         }
-        if !problem_dampler && !safe {
+        if !safe {
             return false;
         }
-        if problem_dampler && !safe {
-            // output = format!("{}damp {}", output, report[i - 1]);
-            let mut report_removed = report.clone();
-            report_removed.remove(i - 1);
-            safe = is_safe_report(report_removed, false);
-            if !safe {
-                // output = format!("{}\t    bump {}", output, report[i]);
-                let mut report_removed = report.clone();
-                report_removed.remove(i);
-                safe = is_safe_report(report_removed, false);
-            }
-            break;
-        }
-    }
-    if !safe {
-        // println!("{}\t    {:?}", output, report);
     }
     safe
 }
