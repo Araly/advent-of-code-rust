@@ -1,5 +1,7 @@
 use std::num::ParseIntError;
 
+use colored::Colorize;
+
 advent_of_code::solution!(2);
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -42,19 +44,22 @@ fn get_reports(input: &str) -> Option<Vec<Vec<u32>>> {
 fn get_safe_reports_count(reports: Vec<Vec<u32>>, problem_dampler: bool) -> Option<u32> {
     let mut count = 0;
     for report in reports {
-        let safe = is_safe_report(report.clone());
-        if safe {
-            count += 1;
-            continue;
-        } else if problem_dampler {
+        let mut safe = is_safe_report(report.clone());
+        if problem_dampler && !safe {
             for i in 0..report.len() {
                 let mut report = report.clone();
                 report.remove(i);
                 if is_safe_report(report) {
-                    count += 1;
+                    safe = true;
                     break;
                 }
             }
+        }
+        if safe {
+            count += 1;
+            println!("{:?} {}", report, "safe".green());
+        } else {
+            println!("{:?} {}", report, "unsafe".red());
         }
     }
 
