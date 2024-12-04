@@ -30,3 +30,4 @@ tinyjson = "2.5.1"
 # Solution dependencies
 colored = "2"
 regex = "1.11.1"
+array2d = "0.3.2"
