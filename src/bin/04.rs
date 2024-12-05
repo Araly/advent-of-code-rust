@@ -13,15 +13,23 @@ pub fn part_one(input: &str) -> Option<u32> {
             count += count_words(&grid, row, column);
         }
     }
-
     Some(count)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u32> {
+    let grid = make_grid(input)?;
+
+    let mut count = 0;
+    for row in 0..grid.row_len() {
+        for column in 0..grid.column_len() {
+            count += count_xs(&grid, row, column);
+        }
+    }
+    Some(count)
 }
 
 const WORD: &str = "XMAS";
+const CROSS_WORD: &str = "AMS";
 
 enum Direction {
     NorthEast,
@@ -59,6 +67,15 @@ impl Direction {
         directions.push(Direction::West);
         directions.push(Direction::NorthWest);
         directions.push(Direction::North);
+        directions
+    }
+
+    fn diagonals() -> Vec<Direction> {
+        let mut directions = Vec::new();
+        directions.push(Direction::NorthEast);
+        directions.push(Direction::SouthEast);
+        directions.push(Direction::SouthWest);
+        directions.push(Direction::NorthWest);
         directions
     }
 }
@@ -107,8 +124,32 @@ fn count_words(grid: &Array2D<char>, row: usize, column: usize) -> u32 {
             count += 1;
         }
     }
-
     count
+}
+
+fn count_xs(grid: &Array2D<char>, row: usize, column: usize) -> u32 {
+    if grid.get(row, column) != Some(&CROSS_WORD.chars().next().unwrap_or('.')) {
+        return 0;
+    }
+    let mut diagonal_chars = vec![];
+    for direction in Direction::diagonals() {
+        let coordinates = direction.step_towards(row, column, 1);
+        let (r, c) = match coordinates {
+            Some((v1, v2)) => (v1, v2),
+            None => return 0,
+        };
+        let char = grid.get(r, c);
+        if char != Some(&CROSS_WORD.chars().nth(1).unwrap_or('.'))
+            && char != Some(&CROSS_WORD.chars().nth(2).unwrap_or('.'))
+        {
+            return 0;
+        }
+        diagonal_chars.push(Some(char));
+    }
+    if diagonal_chars[0] == diagonal_chars[2] || diagonal_chars[1] == diagonal_chars[3] {
+        return 0;
+    }
+    1
 }
 
 #[cfg(test)]
@@ -124,6 +165,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(9));
     }
 }
