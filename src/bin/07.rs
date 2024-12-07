@@ -4,8 +4,8 @@ pub fn part_one(input: &str) -> Option<u64> {
     let lines = input.lines();
     let mut count = 0;
     for line in lines {
-        let mut equation = Equation::new(line)?;
-        if equation.generate_operations(false) {
+        let equation = Equation::new(line)?;
+        if equation.generate_operations_recursive(false) {
             count += equation.result;
         };
     }
@@ -154,17 +154,14 @@ impl Equation {
             println!("not enough numbers");
             return false;
         }
-        self.recursive_generate(
-            match include_concat {
-                false => [Operation::Add, Operation::Multiply].to_vec(),
-                true => [Operation::Add, Operation::Multiply, Operation::Concatenate].to_vec(),
-            },
-            1,
-            self.numbers[0],
-        )
+        let operations = match include_concat {
+            false => &[Operation::Add, Operation::Multiply].to_vec(),
+            true => &[Operation::Add, Operation::Multiply, Operation::Concatenate].to_vec(),
+        };
+        self.recursive_generate(operations, 1, self.numbers[0])
     }
 
-    fn recursive_generate(&self, operations: Vec<Operation>, depth: usize, total: u64) -> bool {
+    fn recursive_generate(&self, operations: &Vec<Operation>, depth: usize, total: u64) -> bool {
         if depth == self.numbers.len() {
             if total == self.result {
                 return true;
@@ -175,12 +172,12 @@ impl Equation {
             return false;
         }
 
-        for operation in operations.clone() {
-            let current_total = match operation.calculate(total, self.numbers[depth]) {
+        for i in 0..operations.len() {
+            let current_total = match operations[i].calculate(total, self.numbers[depth]) {
                 Some(v) => v,
                 None => return false,
             };
-            if self.recursive_generate(operations.clone(), depth + 1, current_total) {
+            if self.recursive_generate(operations, depth + 1, current_total) {
                 return true;
             }
         }
