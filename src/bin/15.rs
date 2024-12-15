@@ -5,7 +5,7 @@ use array2d::Array2D;
 advent_of_code::solution!(15);
 
 pub fn part_one(input: &str) -> Option<usize> {
-    let (mut warehouse, directions) = match parse_input(input) {
+    let (mut warehouse, directions) = match parse_input(input, false) {
         Ok(v) => v,
         Err(e) => {
             println!("couldn't parse input: {e}");
@@ -22,8 +22,22 @@ pub fn part_one(input: &str) -> Option<usize> {
     Some(warehouse.sum_box_coordinates())
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    let (mut warehouse, directions) = match parse_input(input, true) {
+        Ok(v) => v,
+        Err(e) => {
+            println!("couldn't parse input: {e}");
+            return None;
+        }
+    };
+    println!("initial state:");
+    warehouse.print_map();
+    for d in directions {
+        println!("\nmove {}:", d);
+        warehouse.step(d);
+        warehouse.print_map();
+    }
+    Some(warehouse.sum_box_coordinates())
 }
 
 #[derive(Clone)]
@@ -31,6 +45,8 @@ enum Tile {
     Floor,
     Wall,
     Box,
+    BoxLeft,
+    BoxRight,
     Robot,
 }
 
@@ -43,6 +59,8 @@ impl fmt::Display for Tile {
                 Tile::Floor => '.',
                 Tile::Wall => '#',
                 Tile::Box => 'O',
+                Tile::BoxLeft => '[',
+                Tile::BoxRight => ']',
                 Tile::Robot => '@',
             }
         )
@@ -136,48 +154,101 @@ impl Warehouse {
 
     fn step(&mut self, direction: Direction) {
         let (next_y, next_x) = direction.step(self.robot.y, self.robot.x).unwrap();
-        let next_tile = self.map.get(next_y, next_x).unwrap();
-        match next_tile {
-            Tile::Floor => {
-                self.robot = Robot {
-                    x: next_x,
-                    y: next_y,
-                }
-            }
-            Tile::Box => {
-                if self.push_box(next_x, next_y, direction) {
-                    self.robot = Robot {
-                        x: next_x,
-                        y: next_y,
-                    }
-                }
-            }
-            Tile::Wall => return,
-            Tile::Robot => {
-                println!("found a Robot tile while stepping");
-                return;
+        if self.check_push(next_x, next_y, direction.clone()) {
+            self.push_box(next_x, next_y, direction);
+            self.robot = Robot {
+                x: next_x,
+                y: next_y,
             }
         }
     }
-    fn push_box(&mut self, x: usize, y: usize, d: Direction) -> bool {
+
+    fn check_push(&mut self, x: usize, y: usize, d: Direction) -> bool {
+        let (next_y, next_x) = match d.step(y, x) {
+            Some(v) => v,
+            None => return false,
+        };
+        let tile = self.map.get(y, x).unwrap();
+        match tile {
+            Tile::Floor => true,
+            Tile::Box => self.check_push(next_x, next_y, d),
+            Tile::BoxLeft => match d {
+                Direction::West => self.check_push(next_x, next_y, d),
+                // skip the right side of the box
+                Direction::East => self.check_push(next_x + 1, next_y, d),
+                _ => {
+                    // check left and right side of the box
+                    self.check_push(next_x, next_y, d.clone())
+                        && self.check_push(next_x + 1, next_y, d)
+                }
+            },
+            Tile::BoxRight => match d {
+                // skip the left side of the box
+                Direction::West => self.check_push(next_x - 1, next_y, d),
+                Direction::East => self.check_push(next_x, next_y, d),
+                _ => {
+                    // check left and right side of the box
+                    self.check_push(next_x - 1, next_y, d.clone())
+                        && self.check_push(next_x, next_y, d)
+                }
+            },
+            _ => false,
+        }
+    }
+
+    fn push_box(&mut self, x: usize, y: usize, d: Direction) {
         let (next_y, next_x) = d.step(y, x).unwrap();
-        let next_tile = self.map.get(next_y, next_x).unwrap();
-        match next_tile {
-            Tile::Floor => {
+        match self.map.get(y, x).unwrap() {
+            Tile::Box => {
+                self.push_box(next_x, next_y, d);
                 self.map.set(y, x, Tile::Floor).unwrap();
                 self.map.set(next_y, next_x, Tile::Box).unwrap();
-                return true;
             }
-            Tile::Box => {
-                if self.push_box(next_x, next_y, d) {
-                    self.map.set(y, x, Tile::Floor).unwrap();
-                    self.map.set(next_y, next_x, Tile::Box).unwrap();
-                    return true;
-                } else {
-                    return false;
+            Tile::BoxLeft => match d {
+                Direction::West => {
+                    self.push_box(next_x, next_y, d);
+                    self.map.set(y, x + 1, Tile::Floor).unwrap();
+                    self.map.set(y, x, Tile::BoxRight).unwrap();
+                    self.map.set(next_y, next_x, Tile::BoxLeft).unwrap();
                 }
-            }
-            _ => return false,
+                Direction::East => {
+                    self.push_box(next_x + 1, next_y, d);
+                    self.map.set(y, x, Tile::Floor).unwrap();
+                    self.map.set(y, x + 1, Tile::BoxLeft).unwrap();
+                    self.map.set(next_y, next_x + 1, Tile::BoxRight).unwrap();
+                }
+                _ => {
+                    self.push_box(next_x, next_y, d.clone());
+                    self.push_box(next_x + 1, next_y, d);
+                    self.map.set(y, x, Tile::Floor).unwrap();
+                    self.map.set(y, x + 1, Tile::Floor).unwrap();
+                    self.map.set(next_y, next_x, Tile::BoxLeft).unwrap();
+                    self.map.set(next_y, next_x + 1, Tile::BoxRight).unwrap();
+                }
+            },
+            Tile::BoxRight => match d {
+                Direction::West => {
+                    self.push_box(next_x - 1, next_y, d);
+                    self.map.set(y, x, Tile::Floor).unwrap();
+                    self.map.set(y, x - 1, Tile::BoxRight).unwrap();
+                    self.map.set(next_y, next_x - 1, Tile::BoxLeft).unwrap();
+                }
+                Direction::East => {
+                    self.push_box(next_x, next_y, d);
+                    self.map.set(y, x - 1, Tile::Floor).unwrap();
+                    self.map.set(y, x, Tile::BoxLeft).unwrap();
+                    self.map.set(next_y, next_x, Tile::BoxRight).unwrap();
+                }
+                _ => {
+                    self.push_box(next_x - 1, next_y, d.clone());
+                    self.push_box(next_x, next_y, d);
+                    self.map.set(y, x - 1, Tile::Floor).unwrap();
+                    self.map.set(y, x, Tile::Floor).unwrap();
+                    self.map.set(next_y, next_x - 1, Tile::BoxLeft).unwrap();
+                    self.map.set(next_y, next_x, Tile::BoxRight).unwrap();
+                }
+            },
+            _ => {}
         }
     }
 
@@ -187,8 +258,9 @@ impl Warehouse {
         for row in self.map.rows_iter() {
             let mut x = 0;
             for tile in row {
-                if let Tile::Box = tile {
-                    sum += 100 * y + x;
+                match tile {
+                    Tile::Box | Tile::BoxLeft => sum += 100 * y + x,
+                    _ => {}
                 }
                 x += 1;
             }
@@ -198,7 +270,7 @@ impl Warehouse {
     }
 }
 
-fn parse_input(input: &str) -> Result<(Warehouse, Vec<Direction>), String> {
+fn parse_input(input: &str, big_boxes: bool) -> Result<(Warehouse, Vec<Direction>), String> {
     let mut parsing_map = true;
     let mut y = 0;
     let mut robot = Robot { x: 0, y: 0 };
@@ -217,12 +289,27 @@ fn parse_input(input: &str) -> Result<(Warehouse, Vec<Direction>), String> {
                     Some(v) => v,
                     None => return Err(format!("couldn't make new tile from {tile}")),
                 };
-                if let Tile::Robot = tile {
-                    robot = Robot { x, y };
-                    tile = Tile::Floor;
+                if big_boxes {
+                    if let Tile::Robot = tile {
+                        robot = Robot { x, y };
+                        tile = Tile::Floor;
+                    }
+                    if let Tile::Box = tile {
+                        row.push(Tile::BoxLeft);
+                        row.push(Tile::BoxRight);
+                    } else {
+                        row.push(tile.clone());
+                        row.push(tile);
+                    }
+                    x += 2;
+                } else {
+                    if let Tile::Robot = tile {
+                        robot = Robot { x, y };
+                        tile = Tile::Floor;
+                    }
+                    row.push(tile);
+                    x += 1;
                 }
-                row.push(tile);
-                x += 1;
             }
             rows.push(row);
             y += 1;
@@ -258,6 +345,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(9021));
     }
 }
