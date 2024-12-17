@@ -16,11 +16,21 @@ pub fn part_one(input: &str) -> Option<usize> {
             return None;
         }
     };
-    search(&grid, start, end)
+    let (distance, _) = search(&grid, start, end)?;
+    Some(distance)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    let (grid, start, end) = match parse_grid(input) {
+        Ok(v) => v,
+        Err(e) => {
+            println!("couldn't parse grid: {e}");
+            return None;
+        }
+    };
+    let (_, path) = search(&grid, start.clone(), end.clone())?;
+    let path = reconstruct_path(path, start.point, end)?;
+    Some(path.len())
 }
 
 #[derive(Clone)]
@@ -111,7 +121,7 @@ impl Direction {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
 struct Point {
     x: usize,
     y: usize,
@@ -224,16 +234,21 @@ fn next_states(grid: &Array2D<Tile>, state: State) -> Vec<State> {
     states
 }
 
-fn search(grid: &Array2D<Tile>, start: State, end: Point) -> Option<usize> {
+fn search(
+    grid: &Array2D<Tile>,
+    start: State,
+    end: Point,
+) -> Option<(usize, HashMap<Point, Point>)> {
     let mut frontier = BinaryHeap::new();
     let mut distance = HashMap::new();
+    let mut path = HashMap::new();
 
     frontier.push(start.clone());
-    distance.insert(start.point, 0_usize);
+    distance.insert(start.point.clone(), 0_usize);
 
     while let Some(current_state) = frontier.pop() {
         if current_state.point.x == end.x && current_state.point.y == end.y {
-            return Some(current_state.cost);
+            return Some((current_state.cost, path));
         }
         if current_state.cost > *distance.get(&current_state.point).unwrap() {
             continue;
@@ -246,8 +261,28 @@ fn search(grid: &Array2D<Tile>, start: State, end: Point) -> Option<usize> {
                 }
             }
             distance.insert(next_state.point.clone(), next_state.cost);
+            path.insert(next_state.point.clone(), current_state.point.clone());
             frontier.push(next_state);
         }
+    }
+    None
+}
+
+fn reconstruct_path(path: HashMap<Point, Point>, start: Point, end: Point) -> Option<Vec<Point>> {
+    let mut point = end;
+    let mut trail = Vec::new();
+    println!("path: {:?}", path);
+    loop {
+        println!("reconstructing at {:?}", point);
+        let previous_point = match path.get(&point) {
+            Some(v) => v,
+            None => break,
+        };
+        trail.push(point.clone());
+        if point == start {
+            return Some(trail);
+        }
+        point = previous_point.clone();
     }
     None
 }
